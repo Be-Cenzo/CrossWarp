@@ -149,6 +149,9 @@ public class MovableObject : NetworkBehaviour
         }
 
         //if(transitionState != TransitionState.ARtoVR && transitionState != TransitionState.VRtoAR){
+            /*f(transform.parent != null){
+                transform.position = Vector3.Lerp(transform.position, transform.parent.transform.TransformPoint(lastOffsetToSubplane), 0.5f);
+            }*/
             if(!PlatformManager.IsDesktop()){
                 SubplaneConfig subplaneConfig = FindObjectOfType<SubplaneConfig>();
                 if(subplaneConfig){
@@ -186,6 +189,64 @@ public class MovableObject : NetworkBehaviour
         collider.enabled = showing;
         if(showing && (worldState == MovableObjectState.inAR || worldState == MovableObjectState.inVR))
             meshRenderer.material.SetFloat("_DissolveAmount", 0);*/
+    }
+
+    /*void OnCollisionEnter(Collision collision)
+    {
+        Debug.LogError("Collision enter");
+        LayerMask containerLayer = LayerMask.GetMask("ContainerObjects");
+        if(collision.gameObject.layer == containerLayer){
+            if(collision.transform.parent != transform){
+                transform.parent = collision.transform;
+            }
+        }
+    }*/
+
+    void OnTriggerEnter(Collider other)
+    {
+        Debug.LogError("Trigger enter");
+        int containerLayer = LayerMask.NameToLayer("ContainerObjects");
+        Debug.LogError("lay: " + other.gameObject.layer + " " + containerLayer);
+        if(other.gameObject.layer == containerLayer){
+            Debug.LogError("parent: " + other.transform.parent + " " + transform);
+            if(other.transform.parent != transform){
+                transform.SetParent(other.transform, true);
+                networkedScale = transform.localScale;
+                // Vector3 parentScale = transform.parent.transform.localScale;
+                // Vector3 inverseScale = new Vector3(transform.localScale.x/parentScale.x, transform.localScale.y/parentScale.y, transform.localScale.z/parentScale.z);
+                // transform.localScale = inverseScale;
+                CalculateLastOffsetToSubplane(transform.position);
+                Debug.LogError("after: " + transform.parent);
+            }
+        }
+    }
+
+    /*void OnCollisionExit(Collision collision)
+    {
+        Debug.LogError("Collision exit");
+        LayerMask containerLayer = LayerMask.GetMask("ContainerObjects");
+        if(collision.gameObject.layer == containerLayer){
+            if(collision.transform.parent != transform){
+                transform.parent = null;
+            }
+        }
+    }*/
+
+    void OnTriggerExit(Collider other)
+    {
+        Debug.LogError("Trigger exit");
+        int containerLayer = LayerMask.NameToLayer("ContainerObjects");
+        if(other.gameObject.layer == containerLayer){
+            if(other.transform.parent != transform){
+                // Vector3 parentScale = transform.parent.transform.localScale;
+                // Vector3 inverseScale = new Vector3(transform.localScale.x*parentScale.x, transform.localScale.y*parentScale.y, transform.localScale.z*parentScale.z);
+                transform.SetParent(null, true);
+                CalculateLastOffsetToSubplane(transform.position);
+                
+                networkedScale = transform.localScale;
+                //transform.localScale = inverseScale;
+            }
+        }
     }
 
     private void UpdateWorldState(){
@@ -255,6 +316,7 @@ public class MovableObject : NetworkBehaviour
 
     public void UpdatePosition(Vector3 newPosition){
         Debug.Log("Hanno chiamato update transform: " + newPosition);
+        transform.position = Vector3.Lerp(transform.position, newPosition, 0.5f);
 
         SubplaneConfig subplaneConfig = FindObjectOfType<SubplaneConfig>();
             if(subplaneConfig)
@@ -263,6 +325,9 @@ public class MovableObject : NetworkBehaviour
                 activePhoneSubplane = null;
         lastRotationOffsetToSubplane = CalculateLastRotationOffsetToSubplane();
         lastOffsetToSubplane = CalculateLastOffsetToSubplane(newPosition);
+
+        if(GetComponentInChildren<ContainerObject>())
+            GetComponentInChildren<ContainerObject>().UpdateChildrenPositions(newPosition);
 
         UpdateWorldState();
         // Debug.Log("controllato da AR: " + controlledByAR);
@@ -389,6 +454,9 @@ public class MovableObject : NetworkBehaviour
     }
 
     public Vector3 CalculateLastOffsetToSubplane(Vector3 nextPosition){
+        // if(transform.parent != null){
+        //     return transform.parent.transform.InverseTransformPoint(nextPosition);
+        // }
         if(PlatformManager.IsDesktop()){
             Transform NCPCenter = Camera.main.transform.GetChild(0);
             return NCPCenter.InverseTransformPoint(nextPosition);
